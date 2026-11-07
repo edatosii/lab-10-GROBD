@@ -2,15 +2,18 @@ package co.umariana.dao;
 
 import co.umariana.conexion.ConexionBD;
 import co.umariana.modelo.ArbolGenealogico;
+import co.umariana.modelo.Persona;
 import co.umariana.modelo.ResumenArbol;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 
+//trabajo hecho por Gabriel David Obando Rosero
 /**
  * DAO (Data Access Object): la única clase que habla con la base de datos. Guarda los árboles genealógicos
  * en las tablas "arboles" y "miembros" (ver db/schema.sql). Se construye igual que EstudianteDAO del laboratorio 9.
@@ -47,13 +50,69 @@ public class ArbolDAO {
      *         de 100 caracteres, si el árbol es null, o si hubo un error (en ese caso NO queda nada guardado)
      */
     public long guardar(String nombre, ArbolGenealogico arbol) {
-        // TODO Etapa 4.1: valide el nombre; abra la conexión y desactive el auto-commit;
-        //   INSERT INTO arboles (nombre) VALUES (?)  -> use prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)
-        //   y getGeneratedKeys() para leer el id;
-        //   luego, por cada miembro: INSERT INTO miembros (arbol_id, posicion, nombre, nacimiento, fallecimiento)
-        //   VALUES (?, ?, ?, ?, ?)  (fallecimiento null -> ps.setNull(5, java.sql.Types.INTEGER));
-        //   commit; si hay un SQLException: rollback y devuelva -1.
-        throw new UnsupportedOperationException("TODO: guardar");
+        if (nombre == null || nombre.isBlank() || nombre.length() > 100 || arbol == null) {
+            return -1;
+        }
+
+        try (Connection con = ConexionBD.conectar()) {
+            try {
+                con.setAutoCommit(false);
+
+                long id;
+                String sqlArbol = "INSERT INTO arboles (nombre) VALUES (?)";
+                try (PreparedStatement ps = con.prepareStatement(sqlArbol, Statement.RETURN_GENERATED_KEYS)) {
+                    ps.setString(1, nombre);
+                    if (ps.executeUpdate() != 1) {
+                        throw new SQLException("No se pudo guardar el árbol");
+                    }
+                    try (ResultSet keys = ps.getGeneratedKeys()) {
+                        if (!keys.next()) {
+                            throw new SQLException("La base de datos no generó un id para el árbol");
+                        }
+                        id = keys.getLong(1);
+                    }
+                }
+
+                String sqlMiembro = "INSERT INTO miembros "
+                        + "(arbol_id, posicion, nombre, nacimiento, fallecimiento) VALUES (?, ?, ?, ?, ?)";
+                try (PreparedStatement ps = con.prepareStatement(sqlMiembro)) {
+                    for (Persona persona : arbol.miembros()) {
+                        ps.setLong(1, id);
+                        ps.setString(2, persona.getPosicion());
+                        ps.setString(3, persona.getNombre());
+                        ps.setInt(4, persona.getNacimiento());
+                        if (persona.getFallecimiento() == null) {
+                            ps.setNull(5, Types.INTEGER);
+                        } else {
+                            ps.setInt(5, persona.getFallecimiento());
+                        }
+                        if (ps.executeUpdate() != 1) {
+                            throw new SQLException("No se pudo guardar un miembro del árbol");
+                        }
+                    }
+                }
+
+                con.commit();
+                return id;
+            } catch (SQLException e) {
+                try {
+                    con.rollback();
+                } catch (SQLException rollbackError) {
+                    System.out.println(rollbackError.getMessage());
+                }
+                System.out.println(e.getMessage());
+                return -1;
+            } finally {
+                try {
+                    con.setAutoCommit(true);
+                } catch (SQLException e) {
+                    System.out.println(e.getMessage());
+                }
+            }
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+            return -1;
+        }
     }
 
     // =====================================================================
