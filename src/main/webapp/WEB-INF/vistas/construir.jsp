@@ -13,7 +13,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Construir árbol genealógico</title>
-    <link rel="stylesheet" href="css/estilos.css">
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/css/estilos.css">
 </head>
 <body>
 <%@ include file="_menu.jspf" %>
@@ -45,7 +45,7 @@
     <% if (arbol != null) { %>
     <div class="tarjeta">
         <h2>Vista previa (<%= arbol.tamano() %> <%= arbol.tamano() == 1 ? "miembro" : "miembros" %>)</h2>
-        <div class="lienzo"><canvas id="canvas"></canvas></div>
+        <div class="lienzo"><canvas id="canvas" data-miembros="<%= Html.escapar(Json.miembros(arbol.miembros())) %>"></canvas></div>
         <p class="leyenda"><span class="l-sujeto">Sujeto</span><span class="l-asc">Ascendientes (Ahnentafel)</span><span class="l-desc">Descendientes (d'Aboville)</span></p>
 
         <form method="post" action="construir" style="margin-top:1rem">
@@ -57,8 +57,11 @@
             <div class="acciones"><button class="boton acento" type="submit">Guardar en base de datos</button></div>
         </form>
     </div>
-    <script src="js/arbol.js"></script>
-    <script>dibujarArbol(document.getElementById("canvas"), <%= Json.miembros(arbol.miembros()) %>, {});</script>
+    <script src="${pageContext.request.contextPath}/js/arbol.js"></script>
+    <script>
+        const canvas = document.getElementById("canvas");
+        dibujarArbol(canvas, JSON.parse(canvas.dataset.miembros), {});
+    </script>
     <% } %>
 </main>
 <script>
